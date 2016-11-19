@@ -1,25 +1,207 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Activity Monitoring Data"
+author: "Tony Li"
+date: "November 19, 2016"
+output: html_document
 ---
 
+Loading the raw data and appropriate packages into R
+====================================================
 
-## Loading and preprocessing the data
+```{r, message=FALSE}
+library(dplyr)
+library(readr)
+library(ggplot2)
+
+activity <- read_csv("activity.csv")
+```
+
+What is the mean total number of steps taken per day?
+=====================================================
+
+Summarizing the steps in *activity* data table for each day:
+
+```{r}
+activity2 <- activity %>%
+    group_by(date) %>%
+    summarise(steps = sum(steps, na.rm=TRUE))
+```
+
+Here's a sample from *activity2* data table:
+```{r echo=FALSE}
+activity2[1:10,]
+```
+
+Here's a histogram of total steps per day:
+```{r}
+ggplot(data=activity2, aes(x=steps)) +
+    geom_histogram(color="black", fill="green", bins=50) +
+    labs(title="Histogram of Total Steps per Day", x="Steps", y="Frequency")
+```
+
+We want to find out the average and median daily total number of steps.
+```{r mean_med, include=TRUE}
+avg_steps_day <- mean(activity2$steps, na.rm = TRUE)
+med_steps_day <- median(activity2$steps, na.rm = TRUE)
+
+avg_steps_day
+med_steps_day
+```
+
+The average daily total number of steps is approximately `r round(avg_steps_day)` steps.  
+The median daily total number of steps is `r med_steps_day` steps.
+
+What is the average daily activity pattern?
+===========================================
+
+We want to make a time-series plot of the 5-minute interval and the average number
+of steps taken, averaged across all days. 
+
+First, summarizing the steps in *activity* data table by interval:
+```{r}
+activity3 <- activity %>%
+    group_by(interval=interval) %>%
+    summarise(avg_steps = mean(steps, na.rm=TRUE))
+```
+
+Here's a sample from *activity3* data table:
+```{r echo=FALSE}
+activity3[1:10,]
+```
+
+
+Here's the time-series plot showing the total steps over the 5-min intervals:
+
+```{r}
+ggplot(data=activity3, aes(x=interval, y=avg_steps)) +
+    geom_line() +
+    labs(title="Average Steps over 5-min Interval", x="Interval", y="Steps") +
+    scale_x_continuous(breaks=seq(0,max(activity3$interval)+100,200))
+```
+
+We want to find out which interval has the maximum number of steps:
+```{r include=TRUE}
+max_steps_5min <-  activity3[which.max(activity3$avg_steps),]
+max_int <- max_steps_5min$interval
+max_steps <- max_steps_5min$avg_steps
+
+max_int
+max_steps
+```
+The 5-min interval that contains the maximum number of steps is `r max_int` to 
+`r max_int+5` minute which has on average `r round(max_steps)` number of steps.  
+
+
+Imputing Missing Values
+=======================
+
+So far we have been ignoring the existence of missing values ("NA"), which can
+introduce bias into some calculations.  
+
+Calcuting the total number of missing values in the dataset:
+```{r}
+sum(is.na(activity$steps))
+```
+
+There are `r sum(is.na(activity$steps))` rows with missing value. Since we already
+calculated the average number of steps for each 5-min interval, let's fill in
+the missing values with the averages for the interval they are in. Remember that
+the averages are in *activity3* data table.
+
+```{r}
+idx <- is.na(activity$steps)
+na_intervals <-activity$interval[idx]
+activity$steps[idx] <- activity3$avg_steps[match(na_intervals, activity3$interval)]
+```
+
+Now let's check if there is any missing values in the *activity* dataset:
+```{r}
+sum(is.na(activity$steps))
+```
+No more missing values!
+
+
+Using the new data table, let's plot the histogram again and re-calculate the
+mean and median daily total number of steps.  
+
+Here is the histogram:
+```{r}
+activity2_adjNA <- activity %>%
+    group_by(date) %>%
+    summarise(steps = sum(steps))
+
+ggplot(data=activity2_adjNA, aes(x=steps)) +
+    geom_histogram(color="black", fill="green", bins=50) +
+    labs(title="Histogram of Total Steps per Day (Adjusted NA)", x="Steps", y="Frequency")
+```
+
+Comparing to the first histogram we plotted without filling in the missing values, we
+see that the frequency at 0 steps decreases, and the frequency at center increased.
+This is expected since we did fill in the missing data with the average!  
+
+Here's the new mean and median, respectively:
+```{r}
+avg_steps_day_adjNA <- mean(activity2_adjNA$steps)
+med_steps_day_adjNA <- median(activity2_adjNA$steps)
+
+avg_steps_day_adjNA
+med_steps_day_adjNA
+```
+
+The mean increased from `r as.integer(avg_steps_day)` steps to `r as.integer(avg_steps_day_adjNA)` steps.  
+The median increased from `r med_steps_day` steps to `r as.integer(med_steps_day_adjNA)` steps.  
+The new mean and median are the same due to the fact that we added the mean to the 
+missing values.
+
+
+Are there differences in activity patterns between weekdays and weekends?
+==========================================================================
+
+We will create a new factor variable called *wk* with two levels - "weekday"
+and "weekend" indicating whether a given date is a weekday or weekend.
+
+```{r}
+activity$wk <- weekdays(activity$date)
+activity$wk[activity$wk=="Saturday" | activity$wk=="Sunday"] <- "Weekend"
+activity$wk[activity$wk!="Weekend"] <- "Weekday"
+```
+
+Here is a sample of the data set with the new variable:
+```{r echo=FALSE}
+activity[1:10,]
+```
+
+Here is a time-series of total steps by 5-min interval, but broken up by weekdays
+and weekends:
+```{r}
+activity3_adjNA <- activity %>%
+    group_by(interval=interval, wk=wk) %>%
+    summarise(avg_steps = mean(steps))
+
+ggplot(data=activity3_adjNA, aes(x=interval, y=avg_steps)) +
+    geom_line() +
+    facet_grid(wk~.) +
+    labs(title="Average Steps over 5-min Interval", x="Interval", y="Steps") +
+    scale_x_continuous(breaks=seq(0,max(activity3_adjNA$interval)+100,200))
+```
 
 
 
-## What is mean total number of steps taken per day?
 
 
 
-## What is the average daily activity pattern?
 
 
 
-## Imputing missing values
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+
+
+
+
+
+
+
+
+
